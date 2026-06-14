@@ -26,6 +26,26 @@ export function initDb(dbPath?: string): Database.Database {
     if (!fs.existsSync(dataDir)) {
       fs.mkdirSync(dataDir, { recursive: true });
     }
+
+    // Auto-restore seed database on first boot of persistent volume
+    if (!fs.existsSync(resolvedPath) || fs.statSync(resolvedPath).size < 20000) {
+      const seedPaths = [
+        path.resolve(__dirname, '../freeapi_seed.db'),
+        path.resolve(__dirname, '../../freeapi_seed.db'),
+        path.resolve(__dirname, '../../../freeapi_seed.db')
+      ];
+      for (const sp of seedPaths) {
+        if (fs.existsSync(sp)) {
+          console.log(`[Database Seeder] Restoring seed database from ${sp} to ${resolvedPath}`);
+          try {
+            fs.copyFileSync(sp, resolvedPath);
+            break;
+          } catch (err: any) {
+            console.error(`[Database Seeder] Failed to copy seed:`, err.message);
+          }
+        }
+      }
+    }
   }
 
   db = new Database(resolvedPath);

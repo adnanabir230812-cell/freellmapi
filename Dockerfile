@@ -26,6 +26,7 @@ WORKDIR /app
 COPY . .
 
 RUN npm run build
+RUN cp server/data/freeapi.db server/dist/freeapi_seed.db || true
 RUN npm prune --omit=dev
 
 FROM ${NODE_IMAGE} AS runtime
