@@ -1,10 +1,9 @@
 node_modules/
 dist/
-server/data/
-*.db
-*.db-wal
-*.db-shm
-*.bak
+server/data/*.db-wal
+server/data/*.db-shm
+server/data/*.bak
+!server/data/freeapi.db
 .env
 .env.local
 .DS_Store
