@@ -26,9 +26,27 @@ export function initDb(dbPath?: string): Database.Database {
     if (!fs.existsSync(dataDir)) {
       fs.mkdirSync(dataDir, { recursive: true });
     }
+  }
 
-    // Auto-restore seed database on first boot of persistent volume
-    if (!fs.existsSync(resolvedPath) || fs.statSync(resolvedPath).size < 20000) {
+  db = new Database(resolvedPath);
+  if (!isMemory) db.pragma('journal_mode = WAL');
+  db.pragma('foreign_keys = ON');
+
+  migrateDbSchema(db);
+
+  // Auto-restore seed database on boot of persistent volume if keys table is empty
+  if (!isMemory) {
+    let needsSeeding = false;
+    try {
+      const keysCount = db.prepare("SELECT COUNT(*) as count FROM keys").get() as { count: number };
+      if (keysCount.count === 0) {
+        needsSeeding = true;
+      }
+    } catch (err) {
+      needsSeeding = true;
+    }
+
+    if (needsSeeding) {
       const seedPaths = [
         path.resolve(__dirname, '../freeapi_seed.db'),
         path.resolve(__dirname, '../../freeapi_seed.db'),
@@ -36,9 +54,13 @@ export function initDb(dbPath?: string): Database.Database {
       ];
       for (const sp of seedPaths) {
         if (fs.existsSync(sp)) {
-          console.log(`[Database Seeder] Restoring seed database from ${sp} to ${resolvedPath}`);
+          console.log(`[Database Seeder] Keys empty. Restoring seed database from ${sp} to ${resolvedPath}`);
           try {
+            db.close();
             fs.copyFileSync(sp, resolvedPath);
+            db = new Database(resolvedPath);
+            db.pragma('journal_mode = WAL');
+            db.pragma('foreign_keys = ON');
             break;
           } catch (err: any) {
             console.error(`[Database Seeder] Failed to copy seed:`, err.message);
@@ -47,12 +69,6 @@ export function initDb(dbPath?: string): Database.Database {
       }
     }
   }
-
-  db = new Database(resolvedPath);
-  if (!isMemory) db.pragma('journal_mode = WAL');
-  db.pragma('foreign_keys = ON');
-
-  migrateDbSchema(db);
 
   console.log(`Database initialized at ${resolvedPath}`);
   return db;
